@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from agents.base_agent import AgentConfig, BaseAgent
-from schemas.observation import ObservationBatch
+from schemas.observation import Observation, ObservationBatch
 
 
 class OpportunityAgent(BaseAgent):
@@ -21,4 +21,21 @@ class OpportunityAgent(BaseAgent):
         )
 
     def observe(self) -> ObservationBatch:
-        raise NotImplementedError("Observation collection will be implemented next.")
+        watchlist = ("BTC", "ETH", "SOL")
+        return ObservationBatch(
+            agent_name=self.name,
+            items=(
+                Observation(
+                    source="watchlist",
+                    summary="Static watchlist configured for the initial agent loop.",
+                    payload={
+                        "watchlist": list(watchlist),
+                        "trigger": "refresh_market_snapshot",
+                    },
+                ),
+            ),
+            context={
+                "goal": self.config.goal,
+                "watchlist_size": len(watchlist),
+            },
+        )
