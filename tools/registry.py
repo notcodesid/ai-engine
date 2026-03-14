@@ -5,14 +5,11 @@ from dataclasses import dataclass, field
 
 from schemas.observation import JSONValue
 from schemas.tool_result import ToolResult
+from tools.schema import ToolInputSchema
 
 
 ToolHandler = Callable[[dict[str, JSONValue]], ToolResult]
 ToolValidator = Callable[[dict[str, JSONValue]], dict[str, JSONValue]]
-
-
-class ToolInputValidationError(ValueError):
-    """Raised when tool arguments fail validation."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -21,15 +18,19 @@ class ToolDefinition:
     handler: ToolHandler
     description: str = ""
     validator: ToolValidator | None = None
+    input_schema: ToolInputSchema | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValueError("Tool name cannot be empty.")
 
     def validate_arguments(self, arguments: dict[str, JSONValue]) -> dict[str, JSONValue]:
+        validated_arguments = arguments
+        if self.input_schema is not None:
+            validated_arguments = self.input_schema.validate(validated_arguments)
         if self.validator is None:
-            return arguments
-        return self.validator(arguments)
+            return validated_arguments
+        return self.validator(validated_arguments)
 
 
 @dataclass(slots=True)
@@ -48,6 +49,7 @@ class ToolRegistry:
         handler: ToolHandler,
         description: str = "",
         validator: ToolValidator | None = None,
+        input_schema: ToolInputSchema | None = None,
     ) -> None:
         self.register(
             ToolDefinition(
@@ -55,6 +57,7 @@ class ToolRegistry:
                 handler=handler,
                 description=description,
                 validator=validator,
+                input_schema=input_schema,
             )
         )
 

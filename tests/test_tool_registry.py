@@ -5,6 +5,7 @@ import unittest
 from schemas.tool_result import ToolResult
 from tools import build_default_tool_registry
 from tools.registry import ToolDefinition, ToolRegistry
+from tools.schema import ToolFieldSchema, ToolFieldType, ToolInputSchema
 
 
 def sample_tool(arguments: dict) -> ToolResult:
@@ -49,11 +50,22 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertTrue(definition.description)
         self.assertIsNotNone(definition.validator)
+        self.assertIsNotNone(definition.input_schema)
+        self.assertEqual(definition.input_schema.fields[0].name, "watchlist")
+        self.assertEqual(definition.input_schema.fields[0].field_type, ToolFieldType.ARRAY)
 
     def test_tool_definition_validator_can_normalize_input(self) -> None:
         tool = ToolDefinition(
             name="sample_tool",
             handler=sample_tool,
+            input_schema=ToolInputSchema(
+                fields=(
+                    ToolFieldSchema(
+                        name="name",
+                        field_type=ToolFieldType.STRING,
+                    ),
+                )
+            ),
             validator=sample_validator,
         )
 
@@ -67,6 +79,20 @@ class ToolRegistryTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             definition.validate_arguments({"watchlist": []})
+
+    def test_schema_rejects_unexpected_fields(self) -> None:
+        tool = ToolDefinition(
+            name="sample_tool",
+            handler=sample_tool,
+            input_schema=ToolInputSchema(
+                fields=(
+                    ToolFieldSchema(name="name", field_type=ToolFieldType.STRING),
+                ),
+            ),
+        )
+
+        with self.assertRaises(ValueError):
+            tool.validate_arguments({"name": "alpha", "extra": True})
 
 
 if __name__ == "__main__":

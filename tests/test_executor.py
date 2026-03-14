@@ -9,6 +9,7 @@ from schemas.decision import Decision, ToolCall
 from schemas.observation import ObservationBatch
 from schemas.tool_result import ToolResult, ToolResultStatus
 from tools.registry import ToolRegistry
+from tools.schema import ToolFieldSchema, ToolFieldType, ToolInputSchema
 
 
 class DummyAgent(BaseAgent):
@@ -164,6 +165,40 @@ class ExecutorTests(unittest.TestCase):
         self.assertIsNotNone(outcome.tool_result)
         self.assertEqual(outcome.tool_result.status, ToolResultStatus.FAILED)
         self.assertIn("Input validation failed", outcome.tool_result.error_message or "")
+
+    def test_schema_validation_fails_before_handler_runs(self) -> None:
+        decision = Decision(
+            summary="Fetch market snapshot.",
+            confidence=0.8,
+            tool_call=ToolCall(
+                tool_name="get_market_snapshot",
+                arguments={"watchlist": "BTC"},
+            ),
+        )
+        plan = self.planner.plan(self.agent, decision)
+        self.registry.register_handler(
+            name="get_market_snapshot",
+            handler=validating_tool,
+            input_schema=ToolInputSchema(
+                fields=(
+                    ToolFieldSchema(
+                        name="watchlist",
+                        field_type=ToolFieldType.ARRAY,
+                        item_type=ToolFieldType.STRING,
+                        min_items=1,
+                    ),
+                )
+            ),
+            description="Require a non-empty watchlist array.",
+        )
+        executor = Executor(registry=self.registry)
+
+        outcome = executor.execute(plan)
+
+        self.assertEqual(outcome.status, ExecutionStatus.FAILED)
+        self.assertIsNotNone(outcome.tool_result)
+        self.assertEqual(outcome.tool_result.status, ToolResultStatus.FAILED)
+        self.assertIn("must be an array", outcome.tool_result.error_message or "")
 
 
 if __name__ == "__main__":
