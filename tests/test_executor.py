@@ -8,6 +8,7 @@ from engine.planner import Planner, PlanningStatus
 from schemas.decision import Decision, ToolCall
 from schemas.observation import ObservationBatch
 from schemas.tool_result import ToolResult, ToolResultStatus
+from tools.registry import ToolRegistry
 
 
 class DummyAgent(BaseAgent):
@@ -37,12 +38,13 @@ class ExecutorTests(unittest.TestCase):
             )
         )
         self.planner = Planner(available_tools={"get_market_snapshot"})
+        self.registry = ToolRegistry()
 
     def test_noop_plan_is_skipped(self) -> None:
         decision = Decision(summary="Nothing to do.", confidence=0.5)
         plan = self.planner.plan(self.agent, decision)
 
-        outcome = Executor().execute(plan)
+        outcome = Executor(registry=self.registry).execute(plan)
 
         self.assertEqual(plan.status, PlanningStatus.NOOP)
         self.assertEqual(outcome.status, ExecutionStatus.SKIPPED)
@@ -56,7 +58,7 @@ class ExecutorTests(unittest.TestCase):
         )
         plan = self.planner.plan(self.agent, decision)
 
-        outcome = Executor().execute(plan)
+        outcome = Executor(registry=self.registry).execute(plan)
 
         self.assertEqual(plan.status, PlanningStatus.BLOCKED)
         self.assertEqual(outcome.status, ExecutionStatus.SKIPPED)
@@ -73,7 +75,12 @@ class ExecutorTests(unittest.TestCase):
             ),
         )
         plan = self.planner.plan(self.agent, decision)
-        executor = Executor({"get_market_snapshot": successful_tool})
+        self.registry.register_handler(
+            name="get_market_snapshot",
+            handler=successful_tool,
+            description="Return the received arguments.",
+        )
+        executor = Executor(registry=self.registry)
 
         outcome = executor.execute(plan)
 
@@ -94,7 +101,7 @@ class ExecutorTests(unittest.TestCase):
         )
         plan = self.planner.plan(self.agent, decision)
 
-        outcome = Executor().execute(plan)
+        outcome = Executor(registry=self.registry).execute(plan)
 
         self.assertEqual(outcome.status, ExecutionStatus.FAILED)
         self.assertIsNotNone(outcome.tool_result)
@@ -111,7 +118,12 @@ class ExecutorTests(unittest.TestCase):
             ),
         )
         plan = self.planner.plan(self.agent, decision)
-        executor = Executor({"get_market_snapshot": crashing_tool})
+        self.registry.register_handler(
+            name="get_market_snapshot",
+            handler=crashing_tool,
+            description="Raise an exception for testing.",
+        )
+        executor = Executor(registry=self.registry)
 
         outcome = executor.execute(plan)
 

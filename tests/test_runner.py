@@ -12,6 +12,7 @@ from schemas.decision import Decision, ToolCall
 from schemas.observation import Observation, ObservationBatch
 from schemas.run_log import RunStatus
 from schemas.tool_result import ToolResult, ToolResultStatus
+from tools.registry import ToolRegistry
 
 
 class DummyAgent(BaseAgent):
@@ -75,7 +76,13 @@ class RunnerTests(unittest.TestCase):
         self.agent = DummyAgent()
         self.memory = MemoryStore()
         self.planner = Planner(available_tools={"get_market_snapshot"})
-        self.executor = Executor({"get_market_snapshot": successful_tool})
+        registry = ToolRegistry()
+        registry.register_handler(
+            name="get_market_snapshot",
+            handler=successful_tool,
+            description="Return success for runner testing.",
+        )
+        self.executor = Executor(registry=registry)
 
     def test_successful_run_completes_and_is_stored(self) -> None:
         runner = AgentRunner(

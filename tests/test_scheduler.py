@@ -14,6 +14,7 @@ from schemas.decision import Decision, ToolCall
 from schemas.observation import Observation, ObservationBatch
 from schemas.run_log import RunStatus
 from schemas.tool_result import ToolResult
+from tools.registry import ToolRegistry
 
 
 class DueAgent(BaseAgent):
@@ -66,10 +67,16 @@ class SchedulerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.base_time = datetime(2026, 3, 14, 10, 0, tzinfo=timezone.utc)
         self.agent = DueAgent()
+        registry = ToolRegistry()
+        registry.register_handler(
+            name="get_market_snapshot",
+            handler=successful_tool,
+            description="Return scheduler test data.",
+        )
         self.runner = AgentRunner(
             reasoner=StaticReasoner(),
             planner=Planner(available_tools={"get_market_snapshot"}),
-            executor=Executor({"get_market_snapshot": successful_tool}),
+            executor=Executor(registry=registry),
             memory=MemoryStore(),
         )
 

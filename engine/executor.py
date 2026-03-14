@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from engine.planner import PlanOutcome, PlanningStatus
-from schemas.observation import JSONValue
 from schemas.tool_result import ToolResult
-
-
-ToolHandler = Callable[[dict[str, JSONValue]], ToolResult]
+from tools.registry import ToolRegistry
 
 
 class ExecutionStatus(StrEnum):
@@ -32,10 +28,10 @@ class ExecutionOutcome:
 
 @dataclass(slots=True)
 class Executor:
-    tools: dict[str, ToolHandler] = field(default_factory=dict)
+    registry: ToolRegistry = field(default_factory=ToolRegistry)
 
-    def register_tool(self, name: str, handler: ToolHandler) -> None:
-        self.tools[name] = handler
+    def register_tool(self, *, name: str, handler, description: str = "") -> None:
+        self.registry.register_handler(name=name, handler=handler, description=description)
 
     def execute(self, plan: PlanOutcome) -> ExecutionOutcome:
         if plan.status == PlanningStatus.NOOP:
@@ -64,8 +60,8 @@ class Executor:
                 message="Approved plan is missing a tool call.",
             )
 
-        handler = self.tools.get(plan.tool_call.tool_name)
-        if handler is None:
+        tool = self.registry.get(plan.tool_call.tool_name)
+        if tool is None:
             return ExecutionOutcome(
                 status=ExecutionStatus.FAILED,
                 plan=plan,
@@ -77,7 +73,7 @@ class Executor:
             )
 
         try:
-            tool_result = handler(plan.tool_call.arguments)
+            tool_result = tool.handler(plan.tool_call.arguments)
         except Exception as exc:
             return ExecutionOutcome(
                 status=ExecutionStatus.FAILED,

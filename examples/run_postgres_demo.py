@@ -16,17 +16,18 @@ from engine.reasoner import OpportunityReasoner
 from engine.runner import AgentRunner
 from engine.scheduler import Scheduler
 from storage.db import PostgresRunLogBackend
-from tools.market_data import get_market_snapshot
+from tools import build_default_tool_registry
 
 
 def main() -> None:
     backend = PostgresRunLogBackend()
     memory = MemoryStore(backend=backend)
     agent = OpportunityAgent()
+    registry = build_default_tool_registry()
     runner = AgentRunner(
         reasoner=OpportunityReasoner(),
-        planner=Planner(available_tools={"get_market_snapshot"}),
-        executor=Executor({"get_market_snapshot": get_market_snapshot}),
+        planner=Planner(available_tools=registry.names()),
+        executor=Executor(registry=registry),
         memory=memory,
     )
     scheduler = Scheduler()
