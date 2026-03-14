@@ -11,6 +11,13 @@ def sample_tool(arguments: dict) -> ToolResult:
     return ToolResult.success("sample_tool", {"arguments": arguments})
 
 
+def sample_validator(arguments: dict) -> dict:
+    name = arguments.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("name is required")
+    return {"name": name.strip()}
+
+
 class ToolRegistryTests(unittest.TestCase):
     def test_register_and_lookup_tool_definition(self) -> None:
         registry = ToolRegistry()
@@ -41,6 +48,25 @@ class ToolRegistryTests(unittest.TestCase):
         definition = registry.get("get_market_snapshot")
         self.assertIsNotNone(definition)
         self.assertTrue(definition.description)
+        self.assertIsNotNone(definition.validator)
+
+    def test_tool_definition_validator_can_normalize_input(self) -> None:
+        tool = ToolDefinition(
+            name="sample_tool",
+            handler=sample_tool,
+            validator=sample_validator,
+        )
+
+        validated = tool.validate_arguments({"name": "  alpha  "})
+
+        self.assertEqual(validated, {"name": "alpha"})
+
+    def test_default_market_snapshot_validator_rejects_empty_watchlist(self) -> None:
+        registry = build_default_tool_registry()
+        definition = registry.get("get_market_snapshot")
+
+        with self.assertRaises(ValueError):
+            definition.validate_arguments({"watchlist": []})
 
 
 if __name__ == "__main__":

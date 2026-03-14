@@ -73,7 +73,20 @@ class Executor:
             )
 
         try:
-            tool_result = tool.handler(plan.tool_call.arguments)
+            validated_arguments = tool.validate_arguments(plan.tool_call.arguments)
+        except ValueError as exc:
+            return ExecutionOutcome(
+                status=ExecutionStatus.FAILED,
+                plan=plan,
+                tool_result=ToolResult.failed(
+                    tool_name=plan.tool_call.tool_name,
+                    error_message=f"Input validation failed: {exc}",
+                ),
+                message="Tool input validation failed.",
+            )
+
+        try:
+            tool_result = tool.handler(validated_arguments)
         except Exception as exc:
             return ExecutionOutcome(
                 status=ExecutionStatus.FAILED,

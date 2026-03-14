@@ -27,6 +27,17 @@ def crashing_tool(arguments: dict) -> ToolResult:
     raise RuntimeError(f"tool crashed for {arguments!r}")
 
 
+def validating_tool(arguments: dict) -> ToolResult:
+    return ToolResult.success("get_market_snapshot", {"validated_arguments": arguments})
+
+
+def require_watchlist(arguments: dict) -> dict:
+    watchlist = arguments.get("watchlist")
+    if not isinstance(watchlist, list) or not watchlist:
+        raise ValueError("watchlist is required")
+    return {"watchlist": watchlist}
+
+
 class ExecutorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.agent = DummyAgent(
@@ -131,6 +142,28 @@ class ExecutorTests(unittest.TestCase):
         self.assertIsNotNone(outcome.tool_result)
         self.assertEqual(outcome.tool_result.status, ToolResultStatus.FAILED)
         self.assertIn("tool crashed", outcome.tool_result.error_message or "")
+
+    def test_invalid_tool_arguments_fail_before_handler_runs(self) -> None:
+        decision = Decision(
+            summary="Fetch market snapshot.",
+            confidence=0.8,
+            tool_call=ToolCall(tool_name="get_market_snapshot", arguments={}),
+        )
+        plan = self.planner.plan(self.agent, decision)
+        self.registry.register_handler(
+            name="get_market_snapshot",
+            handler=validating_tool,
+            validator=require_watchlist,
+            description="Require watchlist input.",
+        )
+        executor = Executor(registry=self.registry)
+
+        outcome = executor.execute(plan)
+
+        self.assertEqual(outcome.status, ExecutionStatus.FAILED)
+        self.assertIsNotNone(outcome.tool_result)
+        self.assertEqual(outcome.tool_result.status, ToolResultStatus.FAILED)
+        self.assertIn("Input validation failed", outcome.tool_result.error_message or "")
 
 
 if __name__ == "__main__":

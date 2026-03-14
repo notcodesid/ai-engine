@@ -8,6 +8,11 @@ from schemas.tool_result import ToolResult
 
 
 ToolHandler = Callable[[dict[str, JSONValue]], ToolResult]
+ToolValidator = Callable[[dict[str, JSONValue]], dict[str, JSONValue]]
+
+
+class ToolInputValidationError(ValueError):
+    """Raised when tool arguments fail validation."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -15,10 +20,16 @@ class ToolDefinition:
     name: str
     handler: ToolHandler
     description: str = ""
+    validator: ToolValidator | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValueError("Tool name cannot be empty.")
+
+    def validate_arguments(self, arguments: dict[str, JSONValue]) -> dict[str, JSONValue]:
+        if self.validator is None:
+            return arguments
+        return self.validator(arguments)
 
 
 @dataclass(slots=True)
@@ -36,12 +47,14 @@ class ToolRegistry:
         name: str,
         handler: ToolHandler,
         description: str = "",
+        validator: ToolValidator | None = None,
     ) -> None:
         self.register(
             ToolDefinition(
                 name=name,
                 handler=handler,
                 description=description,
+                validator=validator,
             )
         )
 
