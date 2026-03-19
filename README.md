@@ -74,5 +74,3 @@ After Postgres is up, run the persistence-backed demo:
 ```bash
 python3 examples/run_postgres_demo.py
 ```
-
-This uses the same opportunity-agent loop, but stores and reloads run logs from Postgres instead of only keeping them in memory.
